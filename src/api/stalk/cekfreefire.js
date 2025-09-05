@@ -1,4 +1,5 @@
 const fetch = require('node-fetch');
+const axios = require('axios');
 
 // Fungsi untuk mengonversi kode negara ke nama lengkap dengan bendera
 const mooCountry = (value) => {
@@ -257,73 +258,75 @@ const mooCountry = (value) => {
   return regionMap[value] || 'Tidak diketahui';
 };
 
-// Fungsi untuk validasi akun MLBB via GoPay
-async function validateMobileLegendsGopay(userId, zoneId) {
-  const url = 'https://gopay.co.id/games/v1/order/user-account';
-  const payload = {
-    code: 'MOBILE_LEGENDS',
-    data: {
-      userId,
-      zoneId
-    }
-  };
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    return {
-      status: false,
-      message: 'Terjadi kesalahan saat validasi.',
-      error: error.message
-    };
-  }
-}
-
-module.exports = function(app) {
-  app.get('/stalk/mlbb', async (req, res) => {
-  const { userId, zoneId } = req.query;
-
-  if (!userId || !zoneId) {
-    return res.status(400).json({
-      status: false,
-      message: 'Parameter userId dan zoneId harus diisi.'
-    });
-  }
-
-  try {
-    const result = await validateMobileLegendsGopay(userId, zoneId);
-
-    const data = result.data;
-    const username = data.username || 'Tidak ditemukan';
-    const countryCode = data.countryOrigin?.toUpperCase() || '';
-    const countryFull = mooCountry(countryCode);
-
-    // Ambil hanya emoji dari akhir string nama negara
-    const flagEmoji = countryFull.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0] || '';
-
-    return res.status(200).json({
-      status: true,
-      username,
-      country: countryFull,
-      country_flag: flagEmoji
-    });
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
+async function stalkFreeFire(id) {
+let data = JSON.stringify({
+  "app_id": 100067,
+  "login_id": id
 });
+
+let config = {
+  method: 'POST',
+  url: 'https://kiosgamer.co.id/api/auth/player_id_login',
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Content-Type': 'application/json',
+    'sec-ch-ua-platform': '"Android"',
+    'sec-ch-ua': '"Chromium";v="134", "Not:A-Brand";v="24", "Google Chrome";v="134"',
+    'sec-ch-ua-mobile': '?1',
+    'Origin': 'https://kiosgamer.co.id',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
+    'Referer': 'https://kiosgamer.co.id/',
+    'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
+    'Cookie': 'source=mb; region=CO.ID; mspid2=d175049875f78d90e7618f10b5930826; _ga=GA1.1.1096715143.1744003536; language=id; datadome=Oh~Qd6USZYfQps_cIi6V06MyaYyU4M8goxVzxq6lyoLUu6ml9hRkiA6eiMdmFuBr6hwB52PiydIWCRZxWtdE1FQLBGu7nqW5mfbBfXbSLbhg7XlKtPfOVTOzJ4OhLFgm; session_key=4txikks54uzrbj9hz174ic2g8ma0zd2p; _ga_Q7ESEPHPSF=GS1.1.1744003535.1.1.1744004048.0.0.0'
+  },
+  data: data
+};
+
+const api = await axios.request(config);
+return api.data;
+}
+module.exports = function(app) {
+  app.get('/stalk/ff', async (req, res) => {
+    const { id } = req.query;
+
+    if (!id) {
+      return res.status(400).json({
+        status: false,
+        message: 'Parameter id harus diisi.'
+      });
+    }
+
+    try {
+      const result = await stalkFreeFire(id);
+
+      if (!result.nickname) {
+        return res.status(404).json({
+          status: false,
+          message: 'Data tidak ditemukan. Pastikan ID Free Fire yang dimasukkan benar.'
+        });
+      }
+
+  
+      const nickname = result.nickname || 'Tidak ditemukan';
+      const regionCode = (result.region || '').toUpperCase();
+      const regionFull = mooCountry(regionCode);
+      const flagEmoji = regionFull.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0] || '';
+
+      return res.status(200).json({
+        status: true,
+        nickname,
+        region: regionFull,
+        region_flag: flagEmoji
+      });
+    } catch (error) {
+      return res.status(500).json({
+        status: false,
+        message: 'Internal server error',
+        error: error.message
+      });
+    }
+  });
 };
